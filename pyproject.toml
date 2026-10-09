@@ -10,7 +10,7 @@ build-backend = "setuptools.build_meta"
 name = "echoregions"
 description = "Parsers and functions for working with EVR and EVL files"
 readme = "README.md"
-requires-python = ">=3.12,<3.15"
+requires-python = ">=3.13,<3.15"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
 authors = [
@@ -33,15 +33,15 @@ classifiers = [
 ]
 dynamic = ["version"]
 dependencies = [
-    "numpy>=2.2.0",
-    "pandas>=2.2.0",
-    "matplotlib",
-    "regionmask>=0.8.0",
-    "shapely>=2.0.0",
+    "numpy>=2.3.0",
+    "pandas>=2.3.0",
+    "matplotlib>=3.11.0",
+    "regionmask>=0.13.0",
+    "shapely>=2.0.7",
     "zarr>=3",
     "xarray>=2026.01.0",
     "dask>=2026.1.0",
-    "opencv-python",
+    "opencv-python>=4.11.0.86",
 ]
 
 [project.urls]
@@ -51,17 +51,17 @@ Documentation = "https://echoregions.readthedocs.io"
 
 [dependency-groups]
 test = [
-    "pytest>=8.3.3",
+    "pytest>=8.3.4",
     "pytest-cov>=6.0.0",
 ]
 
 docs = [
     "jupyter-book>=2.0.0",
     "linkify-it-py>=2.1.0",
-    "myst-nb>=1.1.2",
-    "numpydoc>=1.8.0",
+    "myst-nb>=1.2.0",
+    "numpydoc>=1.9.0",
     "sphinx>=9.0.0",
-    "sphinx-automodapi>=0.18.0",
+    "sphinx-automodapi>=0.19.0",
     "sphinx-book-theme>=1.1.4",
     "sphinx-comments",
     "sphinx-copybutton",
@@ -70,24 +70,24 @@ docs = [
     "sphinx-panels",
     "sphinx-thebe",
     "sphinx-togglebutton>=0.4.4",
-    "sphinxcontrib-bibtex>=2.6.3",
+    "sphinxcontrib-bibtex>=2.6.4",
     "sphinxcontrib-mermaid>=1.0.0",
     "sphinx-inline-tabs>=2025.12.21.14",
 ]
 
 dev = [
-    "black>=24.8.0",
-    "check-manifest>=0.50",
+    "black>=25.1.0",
+    "check-manifest>=0.51",
     "codespell>=2.4.0",
     "ipykernel>=6.30.0",
     "isort>=6.0.0",
-    "mypy>=1.11.1",
-    "pre-commit>=4.0.0",
-    "pylint>=3.2.7",
-    "ruff>=0.5.6",
+    "mypy>=1.12.0",
+    "pre-commit>=4.1.0",
+    "pylint>=3.3.2",
+    "ruff>=0.7.0",
     "setuptools_scm>=8.2.0",
     "twine>=6.0.0",
-    "wheel>=0.44.0",
+    "wheel>=0.45.0",
 ]
 
 [tool.setuptools]
