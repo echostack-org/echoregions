@@ -1,9 +1,11 @@
 import os
 from typing import Dict, List, Tuple, Union
 
+import cv2
 import numpy as np
 import pandas as pd
 from numpy import ndarray
+from xarray import DataArray
 
 from ..utils.io import check_file
 from ..utils.time import parse_time
@@ -145,6 +147,154 @@ def parse_evr(input_file: str):
         df = pd.concat(rows, ignore_index=True)
         data = df[rows[0].keys()].convert_dtypes()
     return data
+
+
+def parse_mask(
+    mask: DataArray,
+    region_classification: str = "",
+) -> pd.DataFrame:
+    """Parse a binary mask into a Regions2D dataframe."""
+    if mask is None:
+        raise TypeError("The 'mask' parameter must be an xarray.DataArray.")
+    if not isinstance(mask, DataArray):
+        raise TypeError("The 'mask' parameter must be an xarray.DataArray.")
+
+    expected_coords = {"ping_time", "depth"}
+    if set(mask.dims) != expected_coords:
+        raise ValueError(
+            "The 'mask' must have only 'ping_time' and 'depth' as coordinates, "
+            f"but found {sorted(set(mask.dims))}."
+        )
+
+    if mask.isnull().any():
+        raise ValueError(
+            "The 'mask' contains NaN values. Please remove or fill them before proceeding."
+        )
+
+    mask_uint8 = mask.astype(np.uint8)
+    unique_values = np.unique(mask_uint8)
+
+    if (
+        not np.array_equal(unique_values, [0])
+        and not np.array_equal(unique_values, [1])
+        and not np.array_equal(unique_values, [0, 1])
+    ):
+        raise ValueError("The 'mask' must be binary, containing only 0s and 1s.")
+
+    binary_image = mask_uint8.transpose("depth", "ping_time").data
+
+    contours, hierarchy = cv2.findContours(
+        binary_image,
+        cv2.RETR_TREE,
+        cv2.CHAIN_APPROX_NONE,
+    )
+
+    if hierarchy is None:
+        return pd.DataFrame(columns=COLUMNS)
+
+    hierarchy = hierarchy[0]
+
+    file_name = ""
+    file_type = ""
+    evr_file_format_number = ""
+    echoview_version_value = ""
+
+    def _collect_contour_indices(root_index: int) -> List[int]:
+        contour_indices = []
+
+        child_indices = [
+            idx
+            for idx, contour_hierarchy in enumerate(hierarchy)
+            if contour_hierarchy[3] == root_index
+        ]
+
+        if not child_indices:
+            return [root_index]
+
+        # TODO should we support nested contours beyond one level? For now, we only
+        # test for one level of nesting.
+        for child_index in child_indices:
+            contour_indices.append(child_index)
+            contour_indices.extend(_collect_contour_indices(child_index))
+
+        return contour_indices
+
+    rows = []
+
+    root_indices = [
+        idx for idx, contour_hierarchy in enumerate(hierarchy) if contour_hierarchy[3] == -1
+    ]
+
+    # Traverse hierarchy, but append every contour as its own region
+    for root_index in root_indices:
+        contour_indices = _collect_contour_indices(root_index)
+
+        for contour_index in contour_indices:
+            contour = contours[contour_index]
+
+            contour_points = contour.squeeze(axis=1)
+
+            contour_times = mask["ping_time"][contour_points[:, 0]]
+            contour_depths = mask["depth"][contour_points[:, 1]]
+
+            times = np.asarray(contour_times, dtype="datetime64[ns]")
+            depths = np.asarray(contour_depths, dtype=float)
+
+            rows.append(
+                {
+                    "file_name": file_name,
+                    "file_type": file_type,
+                    "evr_file_format_number": evr_file_format_number,
+                    "echoview_version": echoview_version_value,
+                    "region_id": None,
+                    "region_structure_version": "13",
+                    "region_point_count": str(len(times)),
+                    "region_selected": "0",
+                    "region_creation_type": "2",
+                    "dummy": "-1",
+                    "region_bbox_calculated": 1,
+                    "region_bbox_left": np.min(times),
+                    "region_bbox_right": np.max(times),
+                    "region_bbox_top": np.max(depths),
+                    "region_bbox_bottom": np.min(depths),
+                    "region_class": region_classification,
+                    "region_type": "1",
+                    "region_name": None,
+                    "time": times,
+                    "depth": depths,
+                    "region_notes": [],
+                    "region_detection_settings": [],
+                }
+            )
+
+    if not rows:
+        return pd.DataFrame(columns=COLUMNS)
+
+    df = pd.DataFrame(rows, columns=COLUMNS)
+
+    # Remove exact duplicate regions
+    df["_signature"] = list(
+        zip(
+            df["time"].apply(tuple),
+            df["depth"].apply(tuple),
+        )
+    )
+    """
+    df = (
+        df.drop_duplicates(
+            subset="_signature",
+            keep="first",
+        )
+        .drop(columns="_signature")
+        .reset_index(drop=True)
+    )
+    """
+
+    # Assign region_id only after duplicate removal
+    df["region_id"] = range(1, len(df) + 1)
+    df["region_name"] = [f"{region_classification}{region_id}" for region_id in df["region_id"]]
+
+    return df
 
 
 def parse_regions_df(input_file: Union[str, pd.DataFrame]) -> pd.DataFrame:
